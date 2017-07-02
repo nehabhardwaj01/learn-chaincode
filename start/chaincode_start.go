@@ -1,149 +1,218 @@
-/*
-Copyright IBM Corp 2016 All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-		 http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
 	"errors"
 	"fmt"
 
+	"encoding/json"
+
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
-// SimpleChaincode example simple Chaincode implementation
-type SimpleChaincode struct {
+//var logger = shim.NewLogger("mylogger")
+
+type SampleChaincode struct {
 }
 
-// ============================================================================================================================
-// Main
-// ============================================================================================================================
-func main() {
-	err := shim.Start(new(SimpleChaincode))
+//custom data models
+type IdentificationDocs struct{
+	Aadhar		int `json:"aadhar"`
+	Passport	int `json:"passport"`
+	PAN		int `json:"pan"`
+	DrivingLicense	int `json:"drivingLicense"`
+	voterID		int `json:"voterId"`
+}
+
+type PersonalInfo struct {
+	Firstname string `json:"firstname"`
+	Lastname  string `json:"lastname"`
+	Address	  string `json:""address`
+	DOB       string `json:"DOB"`
+	Email     string `json:"email"`
+	Mobile    string `json:"mobile"`
+	Identification IdentificationDocs `json:"identification"`
+}
+
+type FinancialInfo struct {
+	MonthlySalary      int `json:"monthlySalary"`
+	MonthlyRent        int `json:"monthlyRent"`
+	OtherExpenditure   int `json:"otherExpenditure"`
+	MonthlyLoanPayment int `json:"monthlyLoanPayment"`
+}
+
+type History struct{
+	PoliceCase	string	`json:"policeCase"`
+	LawCase		string	`json:"lawCase"`
+	FraudCase	string	`json:"fraudCase"`
+	TerrorismCase	string	`json:"terrorismCase"`
+}
+
+type Customer struct{
+	ID			string	      `json:"customerId"`
+	NumberOfLoans		int		
+	NumberOfPendingLoan	int
+	NumberOfCompletedLoans	int
+	PersonalInfo		PersonalInfo  `json:"personalInfo"`
+	FinancialInfo		FinancialInfo `json:"financialInfo"`
+	CustomerHistory		History	      `json:"customerHistory"`
+}
+
+
+/*type LoanApplication struct {
+	ID                     string        `json:"id"`
+	PropertyId             string        `json:"propertyId"`
+	LandId                 string        `json:"landId"`
+	PermitId               string        `json:"permitId"`
+	BuyerId                string        `json:"buyerId"`
+	AppraisalApplicationId string        `json:"appraiserApplicationId"`
+	SalesContractId        string        `json:"salesContractId"`
+	PersonalInfo           PersonalInfo  `json:"personalInfo"`
+	FinancialInfo          FinancialInfo `json:"financialInfo"`
+	Status                 string        `json:"status"`
+	RequestedAmount        int           `json:"requestedAmount"`
+	FairMarketValue        int           `json:"fairMarketValue"`
+	ApprovedAmount         int           `json:"approvedAmount"`
+	ReviewerId             string        `json:"reviewerId"`
+	LastModifiedDate       string        `json:"lastModifiedDate"`
+}*/
+
+
+func GetCustomer(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	//logger.Debug("Entering GetCustomer")
+
+	if len(args) < 1 {
+		//logger.Error("Invalid number of arguments")
+		return nil, errors.New("Missing Customer ID")
+	}
+
+	var customerId = args[0]
+	bytes, err := stub.GetState(customerId)
 	if err != nil {
-		fmt.Printf("Error starting Simple chaincode: %s", err)
+		//logger.Error("Could not fetch loan application with id "+loanApplicationId+" from ledger", err)
+		return nil, err
 	}
+	return bytes, nil
 }
 
-// Init resets all the things
-/*func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-	if len(args) != 1 {
-		return nil, errors.New("Incorrect number of arguments. Expecting 1")
+func CreateNewCustomer(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	//logger.Debug("Entering CreateNewCustomer")
+
+	if len(args) < 2 {
+		//logger.Error("Invalid number of args")
+		return nil, errors.New("Expected atleast two arguments for new customer creation")
 	}
 
+	var customerId = args[0]
+	var customerData = args[1]
+
+	err := stub.PutState(customerId, []byte(customerData))
+	if err != nil {
+		//logger.Error("Could not save loan application to ledger", err)
+		return nil, err
+	}
+
+	var customEvent = "{eventType: 'newCustomerCreation', description:" + customerId + "' Successfully created'}"
+	err = stub.SetEvent("evtSender", []byte(customEvent))
+	if err != nil {
+		return nil, err
+	}
+	//logger.Info("Successfully saved loan application")
 	return nil, nil
-}*/
-func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-    if len(args) != 1 {
-        return nil, errors.New("Incorrect number of arguments. Expecting 1")
-    }
 
-    err := stub.PutState("hello_world", []byte(args[0]))
-    if err != nil {
-        return nil, err
-    }
-
-    return nil, nil
 }
 
-// Invoke is our entry point to invoke a chaincode function
-/*func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-	fmt.Println("invoke is running " + function)
+/**
+Updates the status of the loan application
+**/
+func UpdateCustomerInformation(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	//logger.Debug("Entering UpdateCustomer")
 
-	// Handle different functions
-	if function == "init" {													//initialize the chaincode state, used as reset
-		return t.Init(stub, "init", args)
+	if len(args) < 2 {
+		//logger.Error("Invalid number of args")
+		return nil, errors.New("Expected atleast two arguments for customers' update")
 	}
-	fmt.Println("invoke did not find func: " + function)					//error
 
-	return nil, errors.New("Received unknown function invocation: " + function)
-}*/
-func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-    fmt.Println("invoke is running " + function)
-
-    // Handle different functions
-    if function == "init" {
-        return t.Init(stub, "init", args)
-    } else if function == "write" {
-        return t.write(stub, args)
-    }
-    fmt.Println("invoke did not find func: " + function)
-
-    return nil, errors.New("Received unknown function invocation")
-}
-
-//New function : Write
-func (t *SimpleChaincode) write(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
-    var name, value string
-    var err error
-    fmt.Println("running write()")
-
-    if len(args) != 2 {
-        return nil, errors.New("Incorrect number of arguments. Expecting 2. name of the variable and value to set")
-    }
-
-    name = args[0]                            //rename for fun
-    value = args[1]
-    err = stub.PutState(name, []byte(value))  //write the variable into the chaincode state
-    if err != nil {
-        return nil, err
-    }
-    return nil, nil
-}
-
-// Query is our entry point for queries
-/*func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-	fmt.Println("query is running " + function)
-
-	// Handle different functions
-	if function == "dummy_query" {											//read a variable
-		fmt.Println("hi there " + function)						//error
-		return nil, nil;
+	var customerId = args[0]
+	var updatedCustomer = args[1]
+	var customer Customer
+	err := json.Unmarshal([]byte(updatedCustomer), customer)
+	customer.ID=customerId
+	
+	laBytes, err := json.Marshal(&customer)
+	if err != nil {
+		//logger.Error("Could not marshal customer update", err)
+		return nil, err
 	}
-	fmt.Println("query did not find func: " + function)						//error
 
-	return nil, errors.New("Received unknown function query: " + function)
-}*/
+	err = stub.PutState(customerId, laBytes)
+	if err != nil {
+		//logger.Error("Could not save customer post update", err)
+		return nil, err
+	}
 
-func (t *SimpleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
-    fmt.Println("query is running " + function)
+	var customEvent = "{eventType: 'customerInformationUpdate', description:" + customerId + "' Successfully updated information'}"
+	err = stub.SetEvent("evtSender", []byte(customEvent))
+	if err != nil {
+		return nil, err
+	}
+	//logger.Info("Successfully updated customer info")
+	return nil, nil
 
-    // Handle different functions
-    if function == "read" {                            //read a variable
-        return t.read(stub, args)
-    }
-    fmt.Println("query did not find func: " + function)
-
-    return nil, errors.New("Received unknown function query")
 }
 
-//New function : Read
-func (t *SimpleChaincode) read(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
-    var name, jsonResp string
-    var err error
+func (t *SampleChaincode) Init(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+	return nil, nil
+}
 
-    if len(args) != 1 {
-        return nil, errors.New("Incorrect number of arguments. Expecting name of the var to query")
-    }
+func (t *SampleChaincode) Query(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+	if function == "GetCustomer" {
+		return GetCustomer(stub, args)
+	}
+	return nil, nil
+}
 
-    name = args[0]
-    valAsbytes, err := stub.GetState(name)
-    if err != nil {
-        jsonResp = "{\"Error\":\"Failed to get state for " + name + "\"}"
-        return nil, errors.New(jsonResp)
-    }
+func GetCertAttribute(stub shim.ChaincodeStubInterface, attributeName string) (string, error) {
+	//logger.Debug("Entering GetCertAttribute")
+	attr, err := stub.ReadCertAttribute(attributeName)
+	if err != nil {
+		return "", errors.New("Couldn't get attribute " + attributeName + ". Error: " + err.Error())
+	}
+	attrString := string(attr)
+	return attrString, nil
+}
 
-    return valAsbytes, nil
+func (t *SampleChaincode) Invoke(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+	if function == "CreateNewCustomer" {
+		username, _ := GetCertAttribute(stub, "username")
+		role, _ := GetCertAttribute(stub, "role")
+		if role == "Bank_Home_Loan_Admin" {
+			return CreateNewCustomer(stub, args)
+		} else {
+			return nil, errors.New(username + " with role " + role + " does not have access to create a loan application")
+		}
+
+	}
+	return nil, nil
+}
+
+type customEvent struct {
+	Type       string `json:"type"`
+	Decription string `json:"description"`
+}
+
+func main() {
+
+	lld, _ := shim.LogLevel("DEBUG")
+	fmt.Println(lld)
+
+	//logger.SetLevel(lld)
+	//fmt.Println(logger.IsEnabledFor(lld))
+
+	err := shim.Start(new(SampleChaincode))
+	if err != nil {
+		//logger.Error("Could not start SampleChaincode")
+	} else {
+		//logger.Info("SampleChaincode successfully started")
+	}
+
 }
